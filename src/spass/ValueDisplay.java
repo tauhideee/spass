@@ -64,13 +64,26 @@ public class ValueDisplay extends JPanel{
 	 * Sets a new array which has to be displayed.
 	 * @param size size of the quadratic array in one dimension
 	 * @param values the array with the values to be displayed
-	 * @param mask an optional boolean array of equal size; or
+	 * @param mask an boolean array of equal size; or
 	 * <code>null</code>
 	 */
 	public void setValues(int size, double[] values, boolean[] mask){
 		this.size = size;
 		this.values = values;
 		this.mask = mask;
+		updateZoom();
+		createImage();
+	}
+	
+	/**
+	 * Sets a new array which has to be displayed.
+	 * @param size size of the quadratic array in one dimension
+	 * @param values the array with the values to be displayed
+	 * <code>null</code>
+	 */
+	public void setValues(int size, double[] values){
+		this.size = size;
+		this.values = values;
 		updateZoom();
 		createImage();
 	}
@@ -84,6 +97,12 @@ public class ValueDisplay extends JPanel{
 		this.mask = mask;
 		createImage();
 	}
+	
+	/**
+	 * Returns the quadratic boolean array which is used to mask the values.
+	 * @return boolean array or <code>null</code> if no mask is present 
+	 */
+	public boolean[] getMask(){ return mask; }
 	
 	/**
 	 * Creates the <code>image</code> from the stored <code>values</code>.

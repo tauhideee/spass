@@ -1,7 +1,6 @@
 package spass;
 
 import java.awt.BorderLayout;
-
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Point;
@@ -26,11 +25,13 @@ import java.io.IOException;
 import java.util.Locale;
 
 import javax.imageio.ImageIO;
+import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JTextField;
 import javax.swing.Timer;
 import javax.swing.TransferHandler;
 
@@ -95,6 +96,15 @@ implements ActionListener,
 	 */
 	public final static int TRAFOMODE_FFT_IM = 3;
 	
+	/**
+	 * What to display for the input side:
+	 * <ul>
+	 * <li><code>SI</code> - Structured Illumination pattern</li>
+	 * <li><code>IMAGE</code> - Image loaded from file</li> 
+	 * <li><code>MUL</code> - element-wise multiplication of image and SI-pattern</li>
+	 * </ul> 
+	 *
+	 */
 	public static enum ValueMode {SI, IMAGE, MUL};
 	
 	protected ValueMode valueMode;
@@ -113,10 +123,12 @@ implements ActionListener,
 	protected JLabel lblCursorTrafo;
 	protected JLabel lblSize;
 	protected JLabel lblSumMul;
+	protected JButton btnFindSIP;
 	protected NumberField angle, phase, wvlen;
 	protected Locale locale;
 	protected JComboBox<String> trafoMode;
-	protected JCheckBox mask00;
+	protected JCheckBox mask;
+	protected JTextField maskRange;
 	protected JCheckBox log;
 
 	/**
@@ -210,10 +222,14 @@ implements ActionListener,
 		trafoMode = new JComboBox<>(trafoModeStrings);
 		trafoMode.addActionListener(this);
 		optionsPanel.add(trafoMode);
-		mask00 = new JCheckBox("Mask (0, 0)");
-		mask00.setSelected(true);
-		optionsPanel.add(mask00);
-		mask00.addActionListener(this);
+		mask = new JCheckBox("Mask");
+		mask.setSelected(true);
+		optionsPanel.add(mask);
+		mask.addActionListener(this);
+		maskRange = new JTextField(3);
+		maskRange.setText("3");
+		maskRange.addActionListener(this);
+		optionsPanel.add(maskRange);
 		log = new JCheckBox("log");
 		log.setSelected(false);
 		optionsPanel.add(log);
@@ -237,6 +253,10 @@ implements ActionListener,
 		sipPanel.add(wvlen);
 		sipPanel.addMouseWheelListener(this);
 		
+		btnFindSIP = new JButton("find SI params");
+		btnFindSIP.addActionListener(this);
+		dataPanel.add(btnFindSIP);
+		
 		// Go Live
 		
 		size = 256;
@@ -244,6 +264,10 @@ implements ActionListener,
 		phase.setNumber(0.0);
 		wvlen.setNumber(8);
 		calculateValues();
+		if(mask.isSelected()){
+			double r = Double.parseDouble(maskRange.getText());
+			outValueDisp.setMask(createMask(size, r));
+		}
 		addKeyListener(this);
 		addMouseListener(this);
 		pack();
@@ -345,11 +369,11 @@ implements ActionListener,
 		repaint();
 	}
 	
+	/**
+	 * Updates the display for the transform result.
+	 */
 	public void updateTrafoDisplay(){
-		if(mask00.isSelected())
-			outValueDisp.setValues(size, trafos, createMask(size));
-		else
-			outValueDisp.setValues(size, trafos, null);
+		outValueDisp.setValues(size, trafos);
 		repaint();
 	}
 	
@@ -479,7 +503,7 @@ implements ActionListener,
 	/**
 	 * Creates a boolean array for the purpose of masking the transform
 	 * array.
-	 * This is helpful to make the interesting parts of the sectra more
+	 * This is helpful to make the interesting parts of the spectrum more
 	 * visible.
 	 * So far only the point <code>0, 0</code> is masked (because this is
 	 * in every transform usually the 'brightest').
@@ -492,6 +516,29 @@ implements ActionListener,
 		mask[0] = false;
 		for(int i=1; i<size*size; i++){
 			mask[i] = true;
+		}
+		return mask;
+	}
+	
+	/**
+	 * Creates a boolean array for the purpose of masking the transform
+	 * array.  All values within the distance of <code>r</code> from the
+	 * origin (0, 0) will be masked.
+	 *  
+	 * @param size size of the quadratic array
+	 * @param r radius of sector mask
+	 * @return quadratic boolean array
+	 */
+	public static boolean[] createMask(int size, double r){
+		boolean[] mask = new boolean[size*size];
+		for(int row=0; row<size; row++){
+			for(int col=0; col<size; col++){
+				int i = row*size+col;
+				if(Math.sqrt(col*col + row*row) > r)
+					mask[i] = true;
+				else
+					mask[i] = false;
+			}
 		}
 		return mask;
 	}
@@ -509,19 +556,70 @@ implements ActionListener,
 			updateTrafoDisplay();
 			repaint();
 		}
-		else if(e.getSource() == mask00){
+		else if(e.getSource() == mask){
 			if( ((JCheckBox) e.getSource()).isSelected() ){
-				outValueDisp.setMask(createMask(size));
+				double r = Double.parseDouble(maskRange.getText());
+				outValueDisp.setMask(createMask(size, r));
 			}
 			else{
 				outValueDisp.setMask(null);
 			}
 			repaint();
 		}
+		else if(e.getSource() == maskRange){
+			if( ((JCheckBox) mask).isSelected() ){
+				double r = Double.parseDouble(maskRange.getText());
+				outValueDisp.setMask(createMask(size, r));
+				repaint();
+			}
+		}
 		else if(e.getSource() == log){
 			outValueDisp.setLog(log.isSelected());
 			updateTrafoDisplay();
 		}
+		else if(e.getSource() == btnFindSIP){
+			findSIP();
+		}
+	}
+	
+	/**
+	 * Finds SI-parameters automatically.
+	 * So far it just locates the first-order maximum in the spectrum.
+	 * It uses the actual trafo- and mask-setting.
+	 * TODO: Calculate phase (needs both real and imaginary part) 
+	 */
+	protected void findSIP(){
+		boolean[] searchMask = outValueDisp.getMask();
+		int iMax = findMax(trafos, searchMask);
+		System.out.println("max: "+iMax+" ("+iMax/size+", "+(iMax % size)+")");
+		int y = iMax / size;
+		int x = iMax % size;
+		angle.setNumber( Math.atan2(y, x) );
+		double w = (double) size / Math.sqrt(x*x + y*y);
+		wvlen.setNumber(w);
+		calculateValues();
+	}
+	
+	/**
+	 * Finds the largest value in the first half of the array
+	 * <code>trafos</code>, ignoring the values indicated by the optional
+	 * <code>mask</code>.
+	 * 
+	 * @param trafos where to search for the largest value
+	 * @param mask determines which values are valid
+	 * @return index of the largest value
+	 */
+	public static int findMax(double[] trafos, boolean[] mask){
+		double max = Double.MIN_VALUE;
+		int iMax = 0;
+		for(int i=0; i<trafos.length/2; i++){
+			if(trafos[i] > max)
+				if(mask == null || mask[i]){
+					max = trafos[i];
+					iMax = i;
+				}
+		}
+		return iMax;
 	}
 	
 	/**
