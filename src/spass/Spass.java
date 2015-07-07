@@ -578,7 +578,7 @@ implements ActionListener,
 	protected void findSIP(){
 		boolean[] searchMask = outValueDisp.getMask();
 		
-		int iMax = findMax(trafos, searchMask);	
+		int iMax = findMaxInFirstHalf(trafos, searchMask);	
 		
 		DoubleFFT_2D transformerFFT = new DoubleFFT_2D(size, size);
 		double[] complex = new double[size*size*2];
@@ -599,10 +599,19 @@ implements ActionListener,
 		calculateValues();
 	}
 	
+	/**
+	 * Calculates SI-parameters from the given array of transform values at
+	 * the given index.
+	 * @param complex quadratic array of values real-imaginary-part-pairs
+	 * @param size the size of the array in one dimension
+	 * @param index index of the value (real-part) where to calculate
+	 * @return SI-parameters
+	 */
 	public static SIParams calcSIPFromTrafo(double[] complex, int size, int index){
 		// calculate angle:
 		int y = index / size;
 		int x = index % size;
+		System.out.println("index="+index+" size="+size+", x="+x+", y="+y);
 		double angle = Math.atan2(y, x);
 		
 		// calculate wavelength:
@@ -612,8 +621,6 @@ implements ActionListener,
 		double real = complex[index*2];
 		double imag = complex[index*2 + 1];
 		double phase = Math.atan2(real, imag) / 2.0 / Math.PI * wvlen;
-		
-		System.out.println("phase: "+phase);
 		
 		return new SIParams(angle, phase, wvlen);
 	}
@@ -644,7 +651,7 @@ implements ActionListener,
 	 * @param mask determines which values are valid
 	 * @return index of the largest value
 	 */
-	public static int findMax(double[] trafos, boolean[] mask){
+	public static int findMaxInFirstHalf(double[] trafos, boolean[] mask){
 		double max = Double.MIN_VALUE;
 		int iMax = 0;
 		for(int i=0; i<trafos.length/2; i++){
