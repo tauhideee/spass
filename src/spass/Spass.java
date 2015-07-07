@@ -402,20 +402,8 @@ implements ActionListener,
 	 * Result will be in <code>trafos</code>.
 	 */
 	protected void transform(){
-		double[] inputValues = null;
-		switch(valueMode){
-		case SI:
-			inputValues = valSIP;
-			break;
-		case IMAGE:
-			inputValues = valImg;
-			break;
-		case MUL:
-			inputValues = valMul;
-			break;
-		default:
-			return;
-		}
+		double[] inputValues = getInputArray();
+		if(inputValues == null) return;
 		switch(trafoMode.getSelectedIndex()){
 		case TRAFOMODE_DHT:
 			// discrete hartley transform
@@ -586,18 +574,65 @@ implements ActionListener,
 	 * Finds SI-parameters automatically.
 	 * So far it just locates the first-order maximum in the spectrum.
 	 * It uses the actual trafo- and mask-setting.
-	 * TODO: Calculate phase (needs both real and imaginary part) 
 	 */
 	protected void findSIP(){
 		boolean[] searchMask = outValueDisp.getMask();
-		int iMax = findMax(trafos, searchMask);
-		System.out.println("max: "+iMax+" ("+iMax/size+", "+(iMax % size)+")");
-		int y = iMax / size;
-		int x = iMax % size;
-		angle.setNumber( Math.atan2(y, x) );
-		double w = (double) size / Math.sqrt(x*x + y*y);
-		wvlen.setNumber(w);
+		
+		int iMax = findMax(trafos, searchMask);	
+		
+		DoubleFFT_2D transformerFFT = new DoubleFFT_2D(size, size);
+		double[] complex = new double[size*size*2];
+		double[] inputValues = getInputArray();
+		for(int i=0; i<size*size; i++){
+			complex[i*2] = inputValues[i];
+			complex[i*2+1] = 0.0;
+		}
+		transformerFFT.complexForward(complex);
+		
+		SIParams params = calcSIPFromTrafo(complex, size, iMax);
+		System.out.println(params);
+		
+		System.out.println("max: "+iMax+" (coords "+iMax/size+", "+(iMax % size)+
+		") complex: "+complex[iMax*2]+", i"+complex[iMax*2+1]);
+		
+		// update:
 		calculateValues();
+	}
+	
+	public static SIParams calcSIPFromTrafo(double[] complex, int size, int index){
+		// calculate angle:
+		int y = index / size;
+		int x = index % size;
+		double angle = Math.atan2(y, x);
+		
+		// calculate wavelength:
+		double wvlen = (double) size / Math.sqrt(x*x + y*y);
+		
+		// calculate phase:		
+		double real = complex[index*2];
+		double imag = complex[index*2 + 1];
+		double phase = Math.atan2(real, imag) / 2.0 / Math.PI * wvlen;
+		
+		System.out.println("phase: "+phase);
+		
+		return new SIParams(angle, phase, wvlen);
+	}
+	
+	/**
+	 * Returns the array for the actual shown values.
+	 * @return array for the actual shown values
+	 */
+	protected double[] getInputArray(){
+		switch(valueMode){
+		case SI:
+			return valSIP;
+		case IMAGE:
+			return valImg;
+		case MUL:
+			return valMul;
+		default:
+			return null;
+		}
 	}
 	
 	/**

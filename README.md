@@ -2,7 +2,7 @@
 
 Structured illumination Pattern Analyzer and Stripe Slicer.
 
-Version 0.020150706
+Version 0.020150707
 
 **Status**: In development.
 
@@ -13,7 +13,7 @@ This tool helps finding the parameters of the structured illumination pattern in
 
 It calculates fourier- or hartly transform in realtime, showing immediately the results of changes in the SI-parameters.
 
-It is possible to view the transforms in logarithmic scale and to mask the (0, 0)-point.
+It is possible to view the transforms in logarithmic scale and to mask the zero-order area.
 
 In multiplication-mode, the result of an element-wise multiplication of the SIM-image and the SI-pattern is shown. Additionally it shows the sum of all pixel values in the multiplication (this will be used for the optimization algorithm to find matching parameters).
 
@@ -33,8 +33,8 @@ Load SIM-image: Drag and drop SIM image into left window (only, if size matches!
 
 Switch between image, SI-pattern and multiplication: Click with right mouse button on left image; or set focus to left image and press [1], [2] or [3].
 
-Change transform algorithm: Use the dropbox (DHT, FFT, ...).
+Change transform algorithm: Use the combobox (DHT, FFT, ...).
 
-Mask the (0, 0)-Point in the spectrum: Click the check box 'Mask (0, 0)'.
+Mask the zero-order area in the spectrum: Click the check box 'Mask', enter a larger value in the box right from the Mask checkbox to increase the masked area.
 
 Switch between linear and logarithmic view of the spectrum: Click the check box 'log'.
