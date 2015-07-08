@@ -592,7 +592,7 @@ implements ActionListener,
 		SIParams params = calcSIPFromTrafo(complex, size, iMax);
 		System.out.println(params);
 		
-		System.out.println("max: "+iMax+" (coords "+iMax/size+", "+(iMax % size)+
+		System.out.println("max: "+iMax+" (coords "+(iMax % size)+", "+(iMax / size)+
 		") complex: "+complex[iMax*2]+", i"+complex[iMax*2+1]);
 		
 		// update:
@@ -620,7 +620,8 @@ implements ActionListener,
 		// calculate phase:		
 		double real = complex[index*2];
 		double imag = complex[index*2 + 1];
-		double phase = Math.atan2(real, imag) / 2.0 / Math.PI * wvlen;
+		double phasePol = Math.atan2(imag, real) + Math.PI/2.0; // phase in rad
+		double phase = phasePol / 2.0 / Math.PI * wvlen; // phase in pixel
 		
 		return new SIParams(angle, phase, wvlen);
 	}
