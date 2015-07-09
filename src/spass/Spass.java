@@ -35,8 +35,9 @@ import javax.swing.JTextField;
 import javax.swing.Timer;
 import javax.swing.TransferHandler;
 
-import org.jtransforms.dht.DoubleDHT_2D;
 import org.jtransforms.fft.DoubleFFT_2D;
+
+import spass.Trafo.Mode;
 
 /**
  * Structured illumination Pattern Analyzer (and Stripe Slicer).
@@ -97,6 +98,11 @@ implements ActionListener,
 	public final static int TRAFOMODE_FFT_IM = 3;
 	
 	/**
+	 * Transform mode: Fast Fourier Transform (phase)
+	 */
+	public final static int TRAFOMODE_FFT_PHASE = 4;
+	
+	/**
 	 * What to display for the input side:
 	 * <ul>
 	 * <li><code>SI</code> - Structured Illumination pattern</li>
@@ -116,7 +122,8 @@ implements ActionListener,
 	protected double[] valImg; // values of image file
 	protected double[] valMul; // values of multiplication
 	protected double sumMul; // pixelsum of multiplication
-	protected double[] trafos; // values of transform
+//	protected double[] trafos; // values of transform
+	protected Trafo trafo;
 	protected JPanel imagePanel;
 	protected JPanel sipPanel;
 	protected JLabel lblCursorValue;
@@ -149,7 +156,7 @@ implements ActionListener,
 		valueMode = ValueMode.SI;
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setLayout(new BorderLayout());
-		
+		trafo = new Trafo();
 		
 		// Image Panel (SI-Pattern and Transformation)
 		
@@ -218,7 +225,8 @@ implements ActionListener,
 				"DHT", 
 				"FFT, abs",
 				"FFT, re",
-				"FFT, im"};
+				"FFT, im",
+				"FFT, phase"};
 		trafoMode = new JComboBox<>(trafoModeStrings);
 		trafoMode.addActionListener(this);
 		optionsPanel.add(trafoMode);
@@ -227,7 +235,7 @@ implements ActionListener,
 		optionsPanel.add(mask);
 		mask.addActionListener(this);
 		maskRange = new JTextField(3);
-		maskRange.setText("3");
+		maskRange.setText("20");
 		maskRange.addActionListener(this);
 		optionsPanel.add(maskRange);
 		log = new JCheckBox("log");
@@ -373,14 +381,29 @@ implements ActionListener,
 	 * Updates the display for the transform result.
 	 */
 	public void updateTrafoDisplay(){
-		outValueDisp.setValues(size, trafos);
+		switch(trafoMode.getSelectedIndex()){
+		case TRAFOMODE_DHT:
+			outValueDisp.setValues(size, trafo.getRealArray());
+			break;
+		case TRAFOMODE_FFT_ABS:
+			outValueDisp.setValues(size, trafo.getAbsArray());
+			break;
+		case TRAFOMODE_FFT_RE:
+			outValueDisp.setValues(size, trafo.getRealArray());
+			break;
+		case TRAFOMODE_FFT_IM:
+			outValueDisp.setValues(size, trafo.getImagArray());
+			break;
+		case TRAFOMODE_FFT_PHASE:
+			outValueDisp.setValues(size, trafo.getPhaseArray());
+			break;
+		}
 		repaint();
 	}
 	
 	/**
 	 * Calculates the SI-pattern values.  The parameters will be read from
-	 * the GUI input elements.
-	 */
+	 * the GUI input elements.	 */
 	protected void calculateValues(){
 		if(valueMode == ValueMode.IMAGE){
 			if(valMul == null) valueMode = ValueMode.SI;
@@ -397,70 +420,14 @@ implements ActionListener,
 		repaint();
 	}
 	
-	/**
-	 * Calculates the transform of the input values.
-	 * Result will be in <code>trafos</code>.
-	 */
 	protected void transform(){
-		double[] inputValues = getInputArray();
-		if(inputValues == null) return;
-		switch(trafoMode.getSelectedIndex()){
-		case TRAFOMODE_DHT:
-			// discrete hartley transform
-			trafos = new double[size*size];
-			System.arraycopy(inputValues, 0, trafos, 0, size*size);
-			DoubleDHT_2D transformerDHT = new DoubleDHT_2D(size, size);
-			transformerDHT.forward(trafos);
-			break;
-
-		case TRAFOMODE_FFT_ABS:
-			// fast fourier transform (absolute value)
-			DoubleFFT_2D transformerFFT = new DoubleFFT_2D(size, size);
-			double[] complex = new double[size*size*2];
-			for(int i=0; i<size*size; i++){
-				complex[i*2] = inputValues[i];
-				complex[i*2+1] = 0.0;
-			}
-			transformerFFT.complexForward(complex);
-			trafos = new double[size*size];
-			for(int i=0; i<size*size; i++){
-				trafos[i] = Math.sqrt(
-								complex[i*2]   * complex[i*2] +
-								complex[i*2+1] * complex[i*2+1]
-							);
-			}
-			break;
-		
-		case TRAFOMODE_FFT_RE:
-			// fast fourier transform (real part)
-			DoubleFFT_2D transformerFFTR = new DoubleFFT_2D(size, size);
-			double[] complexR = new double[size*size*2];
-			for(int i=0; i<size*size; i++){
-				complexR[i*2] = inputValues[i];
-				complexR[i*2+1] = 0.0;
-			}
-			transformerFFTR.complexForward(complexR);
-			trafos = new double[size*size];
-			for(int i=0; i<size*size; i++){
-				trafos[i] = complexR[i*2];
-			}
-			break;
-			
-		case TRAFOMODE_FFT_IM:
-			// fast fourier transform (imaginary part)
-			DoubleFFT_2D transformerFFTI = new DoubleFFT_2D(size, size);
-			double[] complexI = new double[size*size*2];
-			for(int i=0; i<size*size; i++){
-				complexI[i*2] = inputValues[i];
-				complexI[i*2+1] = 0.0;
-			}
-			transformerFFTI.complexForward(complexI);
-			trafos = new double[size*size];
-			for(int i=0; i<size*size; i++){
-				trafos[i] = complexI[i*2+1];
-			}
-			break;			
+		if(trafoMode.getSelectedIndex() == TRAFOMODE_DHT){
+			trafo.transform(getInputArray(), size, Mode.DHT);
 		}
+		else{
+			trafo.transform(getInputArray(), size, Mode.FFT);
+		}
+		
 	}
 		
 	/**
@@ -522,10 +489,15 @@ implements ActionListener,
 		for(int row=0; row<size; row++){
 			for(int col=0; col<size; col++){
 				int i = row*size+col;
-				if(Math.sqrt(col*col + row*row) > r)
-					mask[i] = true;
-				else
+				if( Point.distance(col, row, 0, 0) <= r ||
+					Point.distance(col, row, size-1, 0) <= r ||
+					Point.distance(col, row, 0, size-1) <= r ||
+					Point.distance(col, row, size-1, size-1) <= r )
+				{
 					mask[i] = false;
+				}
+				else
+					mask[i] = true;
 			}
 		}
 		return mask;
@@ -570,15 +542,10 @@ implements ActionListener,
 		}
 	}
 	
-	/**
-	 * Finds SI-parameters automatically.
-	 * So far it just locates the first-order maximum in the spectrum.
-	 * It uses the actual trafo- and mask-setting.
-	 */
-	protected void findSIP(){
+	protected SIParams estimateSIP(){
 		boolean[] searchMask = outValueDisp.getMask();
 		
-		int iMax = findMaxInFirstHalf(trafos, searchMask);	
+		int iMax = findMaxInFirstHalf(trafo.getAbsArray(), searchMask);	
 		
 		DoubleFFT_2D transformerFFT = new DoubleFFT_2D(size, size);
 		double[] complex = new double[size*size*2];
@@ -589,41 +556,33 @@ implements ActionListener,
 		}
 		transformerFFT.complexForward(complex);
 		
-		SIParams params = calcSIPFromTrafo(complex, size, iMax);
+		SIParams params = trafo.getSIParams(iMax);
 		System.out.println(params);
 		
 		System.out.println("max: "+iMax+" (coords "+(iMax % size)+", "+(iMax / size)+
-		") complex: "+complex[iMax*2]+", i"+complex[iMax*2+1]);
+		") complex: "+trafo.getReal(iMax)+", "+trafo.getImag(iMax)+"i");
 		
-		// update:
-		calculateValues();
+		return params;
 	}
 	
 	/**
-	 * Calculates SI-parameters from the given array of transform values at
-	 * the given index.
-	 * @param complex quadratic array of values real-imaginary-part-pairs
-	 * @param size the size of the array in one dimension
-	 * @param index index of the value (real-part) where to calculate
-	 * @return SI-parameters
+	 * Finds SI-parameters automatically.
+	 * So far it just locates the first-order maximum in the spectrum.
+	 * It uses the actual trafo- and mask-setting.
 	 */
-	public static SIParams calcSIPFromTrafo(double[] complex, int size, int index){
-		// calculate angle:
-		int y = index / size;
-		int x = index % size;
-		System.out.println("index="+index+" size="+size+", x="+x+", y="+y);
-		double angle = Math.atan2(y, x);
+	protected void findSIP(){
+		if(trafo.getMode() != Trafo.Mode.FFT) return;
 		
-		// calculate wavelength:
-		double wvlen = (double) size / Math.sqrt(x*x + y*y);
+		SIParams params = estimateSIP();
 		
-		// calculate phase:		
-		double real = complex[index*2];
-		double imag = complex[index*2 + 1];
-		double phasePol = Math.atan2(imag, real) + Math.PI/2.0; // phase in rad
-		double phase = phasePol / 2.0 / Math.PI * wvlen; // phase in pixel
+		// TODO: fit the SI-pattern
 		
-		return new SIParams(angle, phase, wvlen);
+		angle.setNumber(params.angle);
+		phase.setNumber(params.phase);
+		wvlen.setNumber(params.wvlen);
+		
+		// update:
+		calculateValues();
 	}
 	
 	/**
@@ -686,7 +645,7 @@ implements ActionListener,
 			if(p != null){
 				int index = outValueDisp.getIndexOf(e.getX(), e.getY());
 				textV = String.format(locale, "(%d, %d) value: %.3f", p.x, p.y, valSIP[index]);
-				textT = String.format(locale, "(%d, %d) value: %.3f", p.x, p.y, trafos[index]);
+				textT = String.format(locale, "(%d, %d) trafo: %s", p.x, p.y, trafo.toString(index));
 			}
 			lblCursorValue.setText(textV);
 			lblCursorTrafo.setText(textT);
